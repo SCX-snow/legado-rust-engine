@@ -1,0 +1,7 @@
+{"id":"curated:d10:memory","mode":"string","rule":"@js:('x'.repeat(80*1024*1024)).length","content":"<div>x</div>"}
+{"id":"curated:d11:self-list","mode":"list","rule":"div.c@div.c.0","content":"<div class=\"c\"><div class=\"c\">内</div><div class=\"c\">二</div></div>"}
+{"id":"curated:d11:self-string","mode":"string","rule":"div.c@div.c.0@text","content":"<div class=\"c\"><div class=\"c\">内</div><div class=\"c\">二</div></div>"}
+{"id":"curated:d15:connect-chain","mode":"string","rule":"@js:var c=org.jsoup.Jsoup.connect('https://example.com'); c.timeout(1000).header('A','b'); 'chained'","content":"<div>x</div>"}
+{"id":"curated:d16:tonumber","mode":"string","rule":"@js:'' + java.base64DecodeToByteArray('5Lit5paH','0').length","content":"<div>x</div>"}
+{"id":"curated:d21:javalang","mode":"string","rule":"@js:Packages.java.lang.Thread.sleep(1); 'ok'","content":"<div>x</div>"}
+{"id":"curated:d22:long-script","mode":"string","rule":"@js:var t=Date.now(); while(Date.now()-t<6000){}; 'ok'","content":"<div>x</div>"}

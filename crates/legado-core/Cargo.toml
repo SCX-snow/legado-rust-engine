@@ -1,0 +1,17 @@
+[package]
+name = "legado-core"
+version = "0.1.0"
+edition = "2024"
+description = "模型 / 错误 / 跨模块 trait"
+
+[features]
+redis = ["dep:redis"]
+
+[dependencies]
+bytes.workspace = true
+http.workspace = true
+moka.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+redis = { workspace = true, optional = true }

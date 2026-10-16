@@ -1,0 +1,9 @@
+[package]
+name = "legado-replace"
+version = "0.1.0"
+edition = "2024"
+description = "替换净化"
+
+[dependencies]
+legado-core.workspace = true
+legado-regex.workspace = true

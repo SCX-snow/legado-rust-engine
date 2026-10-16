@@ -1,0 +1,15 @@
+[package]
+name = "legado-book"
+version = "0.1.0"
+edition = "2024"
+description = "书源链路：搜索 / 发现 / 详情 / 目录 / 正文"
+
+[dependencies]
+legado-core.workspace = true
+legado-js.workspace = true
+legado-net.workspace = true
+legado-replace.workspace = true
+legado-rule.workspace = true
+legado-regex.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

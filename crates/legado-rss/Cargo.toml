@@ -1,0 +1,13 @@
+[package]
+name = "legado-rss"
+version = "0.1.0"
+edition = "2024"
+description = "RSS：默认解析 + 规则解析"
+
+[dependencies]
+legado-book.workspace = true
+legado-core.workspace = true
+legado-net.workspace = true
+legado-rule.workspace = true
+legado-regex.workspace = true
+quick-xml.workspace = true

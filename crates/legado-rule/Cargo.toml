@@ -1,0 +1,16 @@
+[package]
+name = "legado-rule"
+version = "0.1.0"
+edition = "2024"
+description = "规则引擎：切分 / AST / 求值"
+
+[dependencies]
+legado-core.workspace = true
+legado-regex.workspace = true
+regex.workspace = true
+libxml.workspace = true
+scraper.workspace = true
+ego-tree = "0.11"
+html5ever.workspace = true
+serde_json.workspace = true
+serde_json_path.workspace = true

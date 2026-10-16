@@ -1,0 +1,35 @@
+[package]
+name = "legado-js"
+version = "0.1.0"
+edition = "2024"
+description = "JS 运行时 + java.* + 加解密"
+
+[dependencies]
+legado-core.workspace = true
+http.workspace = true
+futures.workspace = true
+rquickjs = { version = "0.13", features = ["array-buffer", "properties", "classes"] }
+base64 = "0.22"
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
+hmac = "0.12"
+rsa = { version = "0.9", features = ["sha2"] }
+aes.workspace = true
+cbc.workspace = true
+cipher.workspace = true
+ecb.workspace = true
+des.workspace = true
+rand.workspace = true
+zhconv.workspace = true
+legado-regex.workspace = true
+regex.workspace = true
+hex = "0.4"
+encoding_rs.workspace = true
+md-5 = { version = "0.10", features = ["oid"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
