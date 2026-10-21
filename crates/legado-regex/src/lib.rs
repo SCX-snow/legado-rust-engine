@@ -12,39 +12,7 @@ struct URegularExpression {
 type UErrorCode = i32;
 const U_ZERO_ERROR: UErrorCode = 0;
 
-unsafe extern "C" {
-    fn uregex_open(
-        pattern: *const u16,
-        length: i32,
-        flags: u32,
-        pe: *mut c_void,
-        status: *mut UErrorCode,
-    ) -> *mut URegularExpression;
-    fn uregex_close(regexp: *mut URegularExpression);
-    fn uregex_clone(
-        regexp: *const URegularExpression,
-        status: *mut UErrorCode,
-    ) -> *mut URegularExpression;
-    fn uregex_setText(
-        regexp: *mut URegularExpression,
-        text: *const u16,
-        len: i32,
-        status: *mut UErrorCode,
-    );
-    fn uregex_findNext(regexp: *mut URegularExpression, status: *mut UErrorCode) -> i8;
-    fn uregex_start(regexp: *mut URegularExpression, group: i32, status: *mut UErrorCode) -> i32;
-    fn uregex_end(regexp: *mut URegularExpression, group: i32, status: *mut UErrorCode) -> i32;
-    fn uregex_group(
-        regexp: *mut URegularExpression,
-        group: i32,
-        dest: *mut u16,
-        capacity: i32,
-        status: *mut UErrorCode,
-    ) -> i32;
-    fn uregex_groupCount(regexp: *mut URegularExpression, status: *mut UErrorCode) -> i32;
-    fn uregex_setTimeLimit(regexp: *mut URegularExpression, millis: i32, status: *mut UErrorCode);
-    fn u_errorName(code: UErrorCode) -> *const c_char;
-}
+include!(concat!(env!("OUT_DIR"), "/icu.rs"));
 
 fn error_name(code: UErrorCode) -> String {
     if code == U_ZERO_ERROR {
