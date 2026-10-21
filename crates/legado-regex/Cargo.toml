@@ -3,5 +3,9 @@ name = "legado-regex"
 version = "0.1.0"
 edition = "2024"
 description = "ICU4C 正则绑定：对齐 Android 的 java.util.regex 后端（AOSP PatternNative），供规则/净化/书源链路共用"
+license = "AGPL-3.0"
+repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code"
+keywords = ["regex", "icu", "java-regex"]
+categories = ["api-bindings", "text-processing"]
 
 [dependencies]

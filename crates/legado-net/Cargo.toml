@@ -3,6 +3,10 @@ name = "legado-net"
 version = "0.1.0"
 edition = "2024"
 description = "URL 模板 / HTTP / Cookie / 编码 / 限速"
+license = "AGPL-3.0"
+repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code"
+keywords = ["http-client", "url", "cookie", "encoding"]
+categories = ["web-programming::http-client", "web-programming"]
 
 [dependencies]
 legado-core.workspace = true

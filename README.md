@@ -11,7 +11,7 @@ service, or reader.
 Rule semantics, the JavaScript host, network behavior, replacement rules, and RSS are regression-
 tested against output from the real legado engine. The comparison corpus is stored in `fixtures/`.
 
-The current version is **0.1.0** (the first preview release). The API may still change.
+The current version is **0.1.0**, and the API may still change.
 
 ## Features
 

@@ -1,0 +1,197 @@
+# 自动发版：按 Conventional Commits 计算版本号 → 测试 → 改版本 → 打 tag → 发布 crates.io
+#
+# 触发：
+#   * push 到 main                → 只有 feat/fix/perf/破坏性变更才发版，其它提交只做 plan
+#   * Actions → Auto Release 手动 → bump=auto/patch/minor/major，dry_run 只算不发
+#
+# 版本规则（详见 scripts/release_version.py）：
+#   feat: ...                              → minor
+#   fix: / perf: ...                       → patch
+#   <type>!: ... 或正文 BREAKING CHANGE: … → major（0.x 阶段按 minor）
+#   其它 type（chore/docs/refactor/test/ci/build/style）不触发发版
+#
+# 流程：plan（算版本）→ verify（仅发版时跑测试/打包检查）→ release（改版本/提交/打 tag/建 Release）
+#       → publish（复用 publish.yml，skip_verify=true，按依赖顺序上传 crates.io）
+#
+# 仓库需要配置：
+#   * secret CARGO_REGISTRY_TOKEN（见 publish.yml 顶部说明）；
+#   * 若 main 有分支保护导致 GITHUB_TOKEN 推不上去，换一个有 contents: write 的 PAT：
+#     checkout 的 token 与 git push 的凭据都改成 secrets.RELEASE_TOKEN
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      dry_run:
+        description: Only compute the version, do not verify/commit/tag/publish
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compute next version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_version.py \
+            --bump "$BUMP" \
+            --notes-file target/release-notes.md \
+            --github-output "$GITHUB_OUTPUT"
+          {
+            echo "### Release plan"
+            echo
+            cat target/release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nothing to release
+        if: steps.version.outputs.tag == ''
+        run: echo "::notice::没有需要发版的提交（feat/fix/perf/破坏性变更），本次跳过"
+
+  verify:
+    name: Verify before tagging
+    needs: plan
+    if: needs.plan.outputs.tag != '' && inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libxml2-dev libclang-dev libicu-dev
+          # bindgen 需要 libclang.so 所在目录
+          libclang="$(find /usr/lib /usr/local/lib -name 'libclang.so' 2>/dev/null | head -n1)"
+          if [ -n "$libclang" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$libclang")" >> "$GITHUB_ENV"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Offline acceptance suite (fmt + clippy + examples)
+        run: bash scripts/run-tests.sh
+
+      - name: Build .crate archives
+        run: cargo package --workspace --locked --no-verify
+
+  release:
+    name: Bump version and tag
+    needs: [plan, verify]
+    if: needs.plan.outputs.tag != '' && inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Apply version bump
+        id: version
+        env:
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_version.py \
+            --bump "$BUMP" \
+            --apply \
+            --notes-file target/release-notes.md \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Check crates.io token
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::仓库没有配置 CARGO_REGISTRY_TOKEN secret，取消发版（未打 tag）"
+            exit 1
+          fi
+
+      - name: Commit version bump
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): ${{ steps.version.outputs.tag }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::notice::tag $tag 已存在，跳过创建"
+          else
+            git tag -a "$tag" -m "Release $tag"
+            git push origin "$tag"
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::notice::release $tag 已存在，跳过"
+          else
+            gh release create "$tag" --title "$tag" --notes-file target/release-notes.md
+          fi
+
+  publish:
+    name: Publish to crates.io
+    needs: release
+    if: needs.release.outputs.tag != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+      dry_run: false
+      skip_verify: true
+    secrets: inherit

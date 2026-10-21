@@ -3,6 +3,10 @@ name = "legado-rule"
 version = "0.1.0"
 edition = "2024"
 description = "规则引擎：切分 / AST / 求值"
+license = "AGPL-3.0"
+repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code"
+keywords = ["legado", "rule-engine", "css-selector", "xpath", "jsonpath"]
+categories = ["parser-implementations", "web-programming"]
 
 [dependencies]
 legado-core.workspace = true

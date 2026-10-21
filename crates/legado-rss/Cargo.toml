@@ -3,6 +3,10 @@ name = "legado-rss"
 version = "0.1.0"
 edition = "2024"
 description = "RSS：默认解析 + 规则解析"
+license = "AGPL-3.0"
+repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code"
+keywords = ["rss", "atom", "feed"]
+categories = ["parser-implementations", "web-programming"]
 
 [dependencies]
 legado-book.workspace = true

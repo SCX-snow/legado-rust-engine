@@ -3,6 +3,10 @@ name = "legado-js"
 version = "0.1.0"
 edition = "2024"
 description = "JS 运行时 + java.* + 加解密"
+license = "AGPL-3.0"
+repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code"
+keywords = ["javascript", "rquickjs", "rhino", "crypto"]
+categories = ["web-programming", "parser-implementations"]
 
 [dependencies]
 legado-core.workspace = true

@@ -1,0 +1,193 @@
+# Publish to crates.io
+#
+# 三种用法：
+#   * tag 推送 vX.Y.Z（手动打 tag）        → 校验 + 打包 + 发布
+#   * Actions 页手动运行（dry_run 默认开） → 只打包，产物作为 artifact
+#   * 被 release.yml 以可复用工作流调用    → 发布 auto-release 刚打好的 tag（tag 由 GITHUB_TOKEN 推送，
+#     不会自己触发本工作流的 push 事件，所以用 workflow_call 显式调用）
+#
+# 仓库需要配置：
+#   * secret      CARGO_REGISTRY_TOKEN   crates.io API token（需要 publish-new / publish-update 权限）
+#   * environment crates-io              可选；给发布步骤加人工审批或环境保护
+#
+# 说明：crates.io 上 crate 名全局唯一且发布后不可删除，只有对应版本没发过才会真正上传；
+# 已经发布过的版本会自动跳过，所以重复运行是安全的。
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only package, do not publish to crates.io
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to publish (created by the auto-release workflow)
+        type: string
+        required: false
+        default: ""
+      dry_run:
+        description: Only package, do not publish
+        type: boolean
+        required: false
+        default: false
+      skip_verify:
+        description: Skip the verify job (caller already ran the test suite)
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # 依赖拓扑顺序：被依赖的 crate 必须排在前面。
+  # core <- regex <- rule <- net <- js <- replace <- book <- rss <- 门面 crate
+  CRATES: >-
+    legado-core legado-regex legado-rule legado-net legado-js
+    legado-replace legado-book legado-rss legado-rust-engine
+
+jobs:
+  verify:
+    name: Verify and package
+    if: inputs.skip_verify != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libxml2-dev libclang-dev libicu-dev
+          # bindgen 需要 libclang.so 所在目录
+          libclang="$(find /usr/lib /usr/local/lib -name 'libclang.so' 2>/dev/null | head -n1)"
+          if [ -n "$libclang" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$libclang")" >> "$GITHUB_ENV"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Offline acceptance suite (fmt + clippy + examples)
+        run: bash scripts/run-tests.sh
+
+      - name: Build .crate archives
+        run: cargo package --workspace --locked --no-verify
+
+      - name: Upload .crate archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: crates-package
+          path: target/package/*.crate
+          if-no-files-found: error
+
+  publish:
+    name: Publish to crates.io
+    needs: verify
+    # verify 被 skip_verify 跳过时，依赖它的 job 默认也会被跳过，所以这里显式放行 skipped；
+    # verify 真正失败（failure）时仍然不会发布。
+    if: always() && inputs.dry_run != true && (needs.verify.result == 'success' || needs.verify.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Check versions
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "legado-rust-engine"))')"
+          echo "workspace version: $version"
+          distinct="$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(len({p["version"] for p in json.load(sys.stdin)["packages"]}))')"
+          if [ "$distinct" != "1" ]; then
+            echo "::error::workspace 内各 crate 版本不一致，先把版本改成同一个再发布"
+            exit 1
+          fi
+          expected="${EXPECTED_TAG:-}"
+          if [ -z "$expected" ] && [ "$REF_TYPE" = "tag" ]; then
+            expected="$REF_NAME"
+          fi
+          if [ -n "$expected" ] && [ "$expected" != "v$version" ]; then
+            echo "::error::tag $expected 与 Cargo.toml 版本 v$version 不一致"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::缺少 CARGO_REGISTRY_TOKEN secret，无法发布到 crates.io"
+            exit 1
+          fi
+          # 源码构建由 verify job 的测试覆盖；--no-verify 跳过“打包后再构建”的验证，
+          # 因为首次发布时依赖还没上 crates.io，验证构建会解析失败
+          for crate in $CRATES; do
+            if curl -fsS --max-time 20 \
+                -H 'User-Agent: legado-rust-engine-release-action' \
+                "https://crates.io/api/v1/crates/${crate}/${VERSION}" >/dev/null 2>&1; then
+              echo "::notice::${crate} ${VERSION} 已发布，跳过"
+              continue
+            fi
+            echo "publishing ${crate} ${VERSION}"
+            for attempt in 1 2 3 4 5; do
+              if cargo publish -p "${crate}" --locked --no-verify; then
+                break
+              fi
+              if [ "${attempt}" -eq 5 ]; then
+                echo "::error::${crate} ${VERSION} 发布失败"
+                exit 1
+              fi
+              delay=$((attempt * 20))
+              echo "publish 失败（第 ${attempt} 次），${delay}s 后重试"
+              sleep "${delay}"
+            done
+            # 等 crates.io 索引传播，避免下一个 crate 解析不到刚发布的依赖
+            sleep 20
+          done
+          echo "::notice::全部 crate 已发布 ${VERSION}"
+
+      - name: Skip notice (dry run)
+        if: inputs.dry_run == true
+        run: echo "::notice::dry_run 模式：只打包未发布，.crate 产物见 verify job 的 artifact"
