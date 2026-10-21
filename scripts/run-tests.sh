@@ -6,6 +6,10 @@ _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$_repo_root" || exit 1
 source scripts/cargo-env.sh
 
+export TZ=Asia/Shanghai
+export LANG=zh_CN.UTF-8
+export LC_ALL=zh_CN.UTF-8
+
 offline=(
     rule_eval
     rule_corpus
