@@ -161,8 +161,6 @@ def manifests():
 
 
 def rewrite_manifests(old, new):
-    # 两处都要改：crate 自己的 [package] version，以及根清单里 workspace 依赖的
-    # legado-xxx = { version = "...", path = "..." }。
     package_pattern = re.compile(r'^version = "' + re.escape(old) + r'"$', re.M)
     workspace_dep_pattern = re.compile(
         r'^(legado-[a-z0-9-]+ = \{ version = ")' + re.escape(old) + r'(")', re.M

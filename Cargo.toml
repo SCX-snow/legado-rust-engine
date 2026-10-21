@@ -8,7 +8,6 @@ repository = "https://gitea.slcomplex.party/OpenToGithub/legado-rust-engine-code
 readme = "README.md"
 keywords = ["legado", "book-source", "scraper", "rule-engine"]
 categories = ["web-programming", "parsing"]
-# 发布到 crates.io 的包里不需要对拍语料与仓库内验收脚本（fixtures 约 9MB）
 exclude = ["fixtures/**", "scripts/**", ".github/**"]
 
 [workspace]

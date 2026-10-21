@@ -9,10 +9,15 @@ use libxml::xpath::Context;
 use crate::content::{Content, Value};
 use crate::selector::css::RuleOutput;
 
+#[allow(clippy::missing_transmute_annotations)]
 pub(crate) fn silence_errors() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| unsafe {
-        bindings::xmlSetStructuredErrorFunc(std::ptr::null_mut(), Some(swallow));
+        let handler = swallow as *const ();
+        bindings::xmlSetStructuredErrorFunc(
+            std::ptr::null_mut(),
+            Some(std::mem::transmute::<*const (), _>(handler)),
+        );
     });
 }
 

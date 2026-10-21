@@ -25,4 +25,19 @@ if [ ! -d "$CARGO_HOME/registry" ] && [ -d "$HOME/.cargo/registry" ]; then
 fi
 export CARGO_HOME
 
-export LIBCLANG_PATH="${LIBCLANG_PATH:-/usr/lib/llvm/22/lib64}"
+if [ -z "${LIBCLANG_PATH:-}" ]; then
+    for _dir in /usr/lib/llvm/22/lib64 /usr/lib/llvm/22/lib; do
+        if [ -e "$_dir/libclang.so" ]; then
+            LIBCLANG_PATH="$_dir"
+            break
+        fi
+    done
+    if [ -z "${LIBCLANG_PATH:-}" ]; then
+        _libclang="$(find /usr/lib /usr/local/lib -name 'libclang.so*' 2>/dev/null | head -n1)"
+        if [ -n "$_libclang" ]; then
+            LIBCLANG_PATH="$(dirname "$_libclang")"
+        fi
+    fi
+    unset _dir _libclang
+fi
+export LIBCLANG_PATH
