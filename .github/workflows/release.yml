@@ -99,7 +99,7 @@ jobs:
       - name: Offline acceptance suite (fmt + clippy + examples)
         run: |
           set -o pipefail
-          bash scripts/run-tests.sh 2>&1 | tee acceptance.log
+          bash scripts/run-tests.sh 2>&1 | tee "${RUNNER_TEMP}/acceptance.log"
 
       - name: Show acceptance failure tail
         if: failure()
@@ -108,7 +108,7 @@ jobs:
             echo "## Acceptance suite failed"
             echo
             echo '~~~'
-            tail -n 80 acceptance.log
+            tail -n 80 "${RUNNER_TEMP}/acceptance.log"
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -117,7 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: acceptance-log
-          path: acceptance.log
+          path: ${{ runner.temp }}/acceptance.log
           if-no-files-found: ignore
 
       - name: Build .crate archives
